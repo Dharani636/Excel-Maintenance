@@ -11,22 +11,45 @@ interface Student {
   assignment: string;
 }
 
+type Subject = "d" | "i" | "s" | "c";
+
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbxzTuJmUqYpV-9N-fu9Wmu0Nsp2bU3u8H-zSj6InQGjzSdgrERI5iNFWhuQ80Mb4KXQjw/exec";
+  "https://script.google.com/macros/s/AKfycbzfZrCfX46gJ1Dz03eUaVInkt8kIBwpBSWEelWc6ZL5eMo0ZldWr07mhIc1pueO-_iqmw/exec";
+
+const emptyForm = {
+  registerNumber: "",
+  name: "",
+  d: "",
+  i: "",
+  s: "",
+  c: "",
+  assignment: "",
+};
 
 const Home = () => {
   const [data, setData] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [mode, setMode] =
+    useState<"create" | "updateScore" | "updateAssignment">("create");
 
-  const [form, setForm] = useState({
-    registerNumber: "",
-    name: "",
-    d: "",
-    s: "",
-    c: "",
-    i: "",
-    assignment: "",
+  const [form, setForm] = useState<any>(emptyForm);
+  const [topics, setTopics] = useState<Record<Subject, string[]>>({
+    d: [],
+    i: [],
+    s: [],
+    c: [],
   });
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] =
+    useState<"success" | "error" | "">("");
+
+  /* ================= LOAD DATA ================= */
+
+  useEffect(() => {
+    fetchAll();
+    loadTopics();
+  }, []);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -36,219 +59,263 @@ const Home = () => {
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const loadTopics = async () => {
+    for (const type of ["d", "i", "s", "c"] as Subject[]) {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "getAssignments", type }),
+      });
+      const json = await res.json();
+      setTopics((p) => ({ ...p, [type]: json.assignments || [] }));
+    }
   };
+
+  /* ================= POST ================= */
 
   const post = async (payload: any) => {
-    await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-    fetchAll();
-  };
+    setLoading(true);
+    setMessage("");
 
-
-  const downloadExcel = () => {
-    if (data.length === 0) return;
-
-    const headers = [
-      "Register Number",
-      "Name",
-      "D",
-      "S",
-      "C",
-      "I",
-      "Assignment",
-    ];
-
-    const rows = data.map((s) => [
-      `="${s.registerNumber}"`,
-      s.name,
-      s.d,
-      s.s,
-      s.c,
-      s.i,
-      s.assignment,
-    ]);
-
-    const csvContent =
-      [headers, ...rows]
-        .map((row) => row.map(String).join(","))
-        .join("\n");
-
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
+    const res = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "student_scores.csv"; 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const json = await res.json();
+    setLoading(false);
+
+    if (json?.error) {
+      setMessageType("error");
+      setMessage(json.message || "Something went wrong");
+      return;
+    }
+
+    setMessageType("success");
+    setMessage("Operation successful");
+
+    fetchAll();
+    setForm(emptyForm);
+
+    setTimeout(() => {
+      setMessage("");
+      setMessageType("");
+    }, 3000);
   };
+
+  /* ================= STYLES ================= */
+
+  const badge = (v: number) =>
+    v < 25 ? "bg-red-500/30 text-red-400" : "bg-green-500/30 text-green-400";
+
+  const input =
+    "bg-black/40 border border-white/20 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 outline-none";
 
   return (
     <>
       <Navbar />
 
-      <section className="pt-28 pb-16 px-4 bg-linear-to-br from-[#0b0f14] via-[#0e1420] to-black min-h-screen">
-        <div className="max-w-7xl mx-auto">
+      <section className="pt-28 px-6 min-h-screen bg-linear-to-br from-[#0b0f14] via-[#0f172a] to-black text-white">
+        <div className="max-w-7xl mx-auto space-y-8">
 
-          <h2 className="text-3xl font-bold text-center text-white mb-10">
-            📊 Student Performance Dashboard
-          </h2>
+          {/* TITLE */}
+          <h1 className="text-3xl font-bold text-center text-cyan-400">
+            🎓 Student Performance Dashboard
+          </h1>
 
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 mb-8 shadow-xl">
-            <h3 className="text-white text-lg font-semibold mb-4">
-              Manage Student Data
-            </h3>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                ["registerNumber", "Register No"],
-                ["name", "Name"],
-                ["d", "D"],
-                ["s", "S"],
-                ["c", "C"],
-                ["i", "I"],
-              ].map(([name, placeholder]) => (
-                <input
-                  key={name}
-                  name={name}
-                  placeholder={placeholder}
-                  onChange={handleChange}
-                  className="bg-black/40 text-white placeholder-gray-400 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                />
-              ))}
-
-              <input
-                name="assignment"
-                placeholder="Assignment"
-                onChange={handleChange}
-                className="col-span-2 md:col-span-4 bg-black/40 text-white placeholder-gray-400 border border-white/20 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-400"
-              />
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-4 mt-6">
+          {/* MODE TABS */}
+          <div className="flex justify-center gap-4">
+            {[
+              { id: "create", label: "Create Student" },
+              { id: "updateScore", label: "Update Score" },
+              { id: "updateAssignment", label: "Update Assignment" },
+            ].map((t) => (
               <button
-                onClick={() =>
-                  post({
-                    action: "create",
-                    registerNumber: form.registerNumber,
-                    name: form.name,
-                    d: Number(form.d),
-                    s: Number(form.s),
-                    c: Number(form.c),
-                    i: Number(form.i),
-                  })
-                }
-                className="bg-linear-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-full hover:scale-105 transition"
+                key={t.id}
+                onClick={() => {
+                  setMode(t.id as any);
+                  setForm(emptyForm);
+                }}
+                className={`px-5 py-2 rounded-full text-sm transition ${
+                  mode === t.id
+                    ? "bg-cyan-500 text-black"
+                    : "bg-white/10 hover:bg-white/20"
+                }`}
               >
-                ➕ Create
+                {t.label}
               </button>
-
-              <button
-                onClick={() =>
-                  post({
-                    action: "updateScore",
-                    registerNumber: form.registerNumber,
-                    d: Number(form.d),
-                    s: Number(form.s),
-                    c: Number(form.c),
-                    i: Number(form.i),
-                  })
-                }
-                className="bg-linear-to-r from-blue-500 to-cyan-600 text-white px-6 py-2 rounded-full hover:scale-105 transition"
-              >
-                🔄 Update Score
-              </button>
-
-              <button
-                onClick={() =>
-                  post({
-                    action: "updateAssignment",
-                    registerNumber: form.registerNumber,
-                    assignment: form.assignment,
-                  })
-                }
-                className="bg-linear-to-r from-purple-500 to-pink-600 text-white px-6 py-2 rounded-full hover:scale-105 transition"
-              >
-                ✏️ Update Assignment
-              </button>
-            </div>
+            ))}
           </div>
 
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={downloadExcel}
-              className="bg-linear-to-r from-yellow-400 to-orange-500 text-black font-semibold px-6 py-2 rounded-full hover:scale-105 transition"
+          {/* MESSAGE */}
+          {message && (
+            <div
+              className={`max-w-3xl mx-auto text-center py-2 rounded-lg font-semibold ${
+                messageType === "success"
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-red-500/20 text-red-400"
+              }`}
             >
-              ⬇ Download Excel
+              {message}
+            </div>
+          )}
+
+          {/* FORM */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-3xl mx-auto space-y-4">
+            <input
+              className={input}
+              placeholder="Register Number"
+              value={form.registerNumber}
+              onChange={(e) =>
+                setForm({ ...form, registerNumber: e.target.value })
+              }
+            />
+
+            {mode === "create" && (
+              <input
+                className={input}
+                placeholder="Student Name"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({ ...form, name: e.target.value })
+                }
+              />
+            )}
+
+            {mode !== "updateAssignment" && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {(["d", "i", "s", "c"] as Subject[]).map((k) => (
+                  <input
+                    key={k}
+                    className={input}
+                    placeholder={k.toUpperCase()}
+                    value={form[k]}
+                    onChange={(e) =>
+                      setForm({ ...form, [k]: e.target.value })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {mode === "updateAssignment" && (
+              <input
+                className={input}
+                placeholder="Assignment"
+                value={form.assignment}
+                onChange={(e) =>
+                  setForm({ ...form, assignment: e.target.value })
+                }
+              />
+            )}
+
+            <button
+              disabled={loading}
+              onClick={() => post({ action: mode, ...form })}
+              className="w-full bg-cyan-500 text-black py-2 rounded-lg font-semibold hover:bg-cyan-400 disabled:opacity-50"
+            >
+              {loading ? "Processing..." : "Submit"}
             </button>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl overflow-x-auto">
-            {loading ? (
-              <p className="text-center text-white py-8">Loading...</p>
-            ) : (
-              <table className="min-w-full text-sm text-white">
-                <thead className="bg-white/10 text-cyan-300">
-                  <tr>
-                    {["Reg", "Name", "D", "S", "C", "I", "Assignment", "Action"].map(
-                      (h) => (
-                        <th key={h} className="px-4 py-3 text-left">
-                          {h}
-                        </th>
-                      )
-                    )}
-                  </tr>
-                </thead>
+          {/* LOADING */}
+          {loading && (
+            <div className="text-center text-cyan-300 font-semibold">
+              Loading...
+            </div>
+          )}
 
-                <tbody>
-                  {data.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-8 text-gray-400">
-                        No Records Found
-                      </td>
-                    </tr>
-                  ) : (
-                    data.map((item, i) => (
-                      <tr
-                        key={i}
-                        className="border-t border-white/10 hover:bg-white/5 transition"
-                      >
-                        <td className="px-4 py-3">{item.registerNumber}</td>
-                        <td className="px-4 py-3">{item.name}</td>
-                        <td className="px-4 py-3">{item.d}</td>
-                        <td className="px-4 py-3">{item.s}</td>
-                        <td className="px-4 py-3">{item.c}</td>
-                        <td className="px-4 py-3">{item.i}</td>
-                        <td className="px-4 py-3 text-pink-400 font-medium">
-                          {item.assignment}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() =>
-                              post({
-                                action: "delete",
-                                registerNumber: item.registerNumber,
-                              })
-                            }
-                            className="bg-red-500/20 text-red-400 border border-red-500/30 px-4 py-1 rounded-full hover:bg-red-500/40 transition"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+          {/* TABLE */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/10 text-cyan-300">
+                <tr>
+                  {["Reg", "Name", "D", "I", "S", "C", "Assignment", "Action"].map(
+                    (h) => (
+                      <th key={h} className="px-4 py-3 text-left">
+                        {h}
+                      </th>
+                    )
                   )}
-                </tbody>
-              </table>
-            )}
+                </tr>
+              </thead>
+
+              <tbody>
+                {data.map((s) => (
+                  <tr
+                    key={s.registerNumber}
+                    className="border-t border-white/10 hover:bg-white/5"
+                  >
+                    <td className="px-4 py-3">{s.registerNumber}</td>
+                    <td className="px-4 py-3 font-semibold">{s.name}</td>
+
+                    {(["d", "i", "s", "c"] as Subject[]).map((k) => (
+                      <td key={k} className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded ${badge(s[k])}`}>
+                          {s[k]}
+                        </span>
+                      </td>
+                    ))}
+
+                    <td className="px-4 py-3 space-y-2">
+                      <div className="text-cyan-400">
+                        {s.assignment || "No Assignment"}
+                      </div>
+
+                      <select
+                        className="bg-black/40 border border-white/20 rounded px-2 py-1 w-full"
+                        onChange={(e) =>
+                          post({
+                            action: "updateAssignment",
+                            registerNumber: s.registerNumber,
+                            assignment: e.target.value,
+                          })
+                        }
+                      >
+                        <option>Change Assignment</option>
+                        {s.d < 25 &&
+                          topics.d.map((t, i) => (
+                            <option key={i} value={`D - ${t}`}>
+                              D - {t}
+                            </option>
+                          ))}
+                        {s.i < 25 &&
+                          topics.i.map((t, i) => (
+                            <option key={i} value={`I - ${t}`}>
+                              I - {t}
+                            </option>
+                          ))}
+                        {s.s < 25 &&
+                          topics.s.map((t, i) => (
+                            <option key={i} value={`S - ${t}`}>
+                              S - {t}
+                            </option>
+                          ))}
+                        {s.c < 25 &&
+                          topics.c.map((t, i) => (
+                            <option key={i} value={`C - ${t}`}>
+                              C - {t}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() =>
+                          post({
+                            action: "delete",
+                            registerNumber: s.registerNumber,
+                          })
+                        }
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
