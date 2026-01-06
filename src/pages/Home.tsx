@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import * as XLSX from "xlsx";
 
 interface Student {
   registerNumber: string;
@@ -101,6 +102,38 @@ const Home = () => {
       setMessageType("");
     }, 3000);
   };
+
+  const downloadExcel = () => {
+  if (!data.length) return;
+
+  const excelData = data.map((s) => ({
+    "Register Number": `${s.registerNumber}`,
+    Name: s.name,
+    D: s.d,
+    I: s.i,
+    S: s.s,
+    C: s.c,
+    Assignment: s.assignment || "",
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(excelData);
+
+  ws["!cols"] = [
+    { wch: 20 }, 
+    { wch: 20 },
+    { wch: 5 },
+    { wch: 5 },
+    { wch: 5 },
+    { wch: 5 },
+    { wch: 30 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Students");
+
+  XLSX.writeFile(wb, "Student_Performance.xlsx");
+};
+
 
   /* ================= STYLES ================= */
 
@@ -223,6 +256,16 @@ const Home = () => {
               Loading...
             </div>
           )}
+
+            {/* Downloading */}
+           <div className="flex justify-end">
+            <button
+              onClick={downloadExcel}
+              className="bg-green-500 text-black px-5 py-2 rounded-lg font-semibold hover:bg-green-400 transition"
+            >
+              ⬇ Download Excel
+            </button>
+          </div>
 
           {/* TABLE */}
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl overflow-x-auto">
